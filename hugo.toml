@@ -1,0 +1,4 @@
+baseURL = 'https://kindamurmur.github.io/'
+languageCode = 'zh-tw'
+title = '喃喃自語'
+theme = 'ananke' 
