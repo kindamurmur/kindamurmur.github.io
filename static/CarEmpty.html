@@ -4,34 +4,34 @@
   <meta charset="UTF-8">
   <title>車位資訊</title>
   <style>
-    /* 基準字體大小：使用 viewport 寬度的 2% */
+    /* 基準字體大小：隨螢幕寬度縮放，最小16px，最大32px */
     html {
-      font-size: 2vw; 
+      font-size: clamp(16px, 4vw, 32px);
     }
 
     body { 
       font-family: Arial, sans-serif; 
-      font-size: 1rem; /* 1rem = html 設定的字體大小 */
+      font-size: 1rem; /* 相對於 html 的字體大小 */
       padding: 1em;
     }
 
     .table-container {
       width: 100%;
-      overflow-x: auto;
-      max-height: 60vh; /* 高度用 viewport 高度百分比 */
+      overflow-x: auto; /* 允許橫向滑動 */
+      max-height: 60vh; /* 限制高度，方便垂直滾動 */
     }
 
     table { 
       border-collapse: collapse; 
       width: 100%; 
       margin-top: 1em; 
-      font-size: 1rem; 
-      min-width: 400px; 
+      font-size: 1.2rem; /* 表格字體比正文稍大 */
+      min-width: 300px; 
     }
 
     th, td { 
       border: 1px solid #ccc; 
-      padding: 0.8em; 
+      padding: 1em; 
       text-align: left; 
       white-space: nowrap; 
     }
