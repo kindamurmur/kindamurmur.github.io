@@ -4,59 +4,65 @@
   <meta charset="UTF-8">
   <title>車位資訊</title>
   <style>
+    /* 基準字體大小：使用 viewport 寬度的 2% */
+    html {
+      font-size: 2vw; 
+    }
+
     body { 
       font-family: Arial, sans-serif; 
-      font-size: 18px; 
-      padding: 10px;
+      font-size: 1rem; /* 1rem = html 設定的字體大小 */
+      padding: 1em;
     }
+
     .table-container {
       width: 100%;
-      overflow-x: auto; /* 允許橫向滑動 */
-      max-height: 400px; /* 限制高度，方便測試垂直滾動 */
+      overflow-x: auto;
+      max-height: 60vh; /* 高度用 viewport 高度百分比 */
     }
+
     table { 
       border-collapse: collapse; 
       width: 100%; 
-      margin-top: 20px; 
-      font-size: 18px; 
+      margin-top: 1em; 
+      font-size: 1rem; 
       min-width: 400px; 
     }
+
     th, td { 
       border: 1px solid #ccc; 
-      padding: 12px; 
+      padding: 0.8em; 
       text-align: left; 
       white-space: nowrap; 
     }
+
     th { 
       background-color: #f2f2f2; 
-      position: sticky;   /* 固定表頭 */
-      top: 0;             /* 固定在容器頂端 */
-      z-index: 2;         /* 確保在內容上方 */
+      position: sticky; 
+      top: 0; 
+      z-index: 2; 
     }
+
     td:first-child, th:first-child {
-      position: sticky;   /* 固定第一欄 */
-      left: 0;            /* 固定在容器左側 */
-      background-color: #fff; /* 避免透明造成重疊 */
-      z-index: 1;         /* 確保在其他欄位上方 */
+      position: sticky;
+      left: 0;
+      background-color: #fff;
+      z-index: 1;
     }
+
     th:first-child {
-      z-index: 3; /* 表頭第一欄要更高層級，避免被蓋住 */
+      z-index: 3;
     }
+
     #lastUpdate, #countdown, #totalEmpty { 
-      margin-top: 12px; 
-      font-size: 16px; 
+      margin-top: 0.8em; 
+      font-size: 0.9rem; 
       color: #333; 
     }
+
     .highlight { 
       background-color: #ffcccc; 
       font-weight: bold; 
-    }
-
-    /* 手機響應式設計 */
-    @media (max-width: 600px) {
-      body { font-size: 20px; }
-      table { font-size: 20px; }
-      th, td { padding: 14px; }
     }
   </style>
 </head>
