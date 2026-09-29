@@ -1,0 +1,104 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>車位資訊</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    #lastUpdate, #countdown, #totalEmpty { margin-top: 10px; font-size: 14px; color: #555; }
+    .highlight { background-color: #ffcccc; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>陽明山停車場即時資訊</h1>
+  <table id="parkingTable">
+    <thead>
+      <tr>
+        <th>名稱</th>
+        <th>剩餘車位</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="lastUpdate">最後更新時間：尚未更新</div>
+  <div id="countdown">下次更新剩餘秒數：30</div>
+  <div id="totalEmpty">總剩餘車位數：尚未計算</div>
+
+  <script>
+    const siteIds = [40908, 40909, 40910, 40911, 40912];
+    const tableBody = document.querySelector("#parkingTable tbody");
+    const lastUpdateDiv = document.getElementById("lastUpdate");
+    const countdownDiv = document.getElementById("countdown");
+    const totalEmptyDiv = document.getElementById("totalEmpty");
+    let countdown = 30;
+    let countdownTimer;
+
+    async function fetchData() {
+      tableBody.innerHTML = ""; // 清空舊資料
+      let totalEmpty = 0;
+
+      for (const id of siteIds) {
+        try {
+          const response = await fetch(`https://ymsnpapi.altob.com.tw/api/Map/Get?siteId=${id}`);
+          const data = await response.json();
+          const row = document.createElement("tr");
+          const nameCell = document.createElement("td");
+          const carEmptyCell = document.createElement("td");
+
+          nameCell.textContent = data.name || "未知";
+          carEmptyCell.textContent = data.carEmpty ?? "N/A";
+
+          // 高亮剩餘車位不足 5 格
+          if (typeof data.carEmpty === "number" && data.carEmpty < 5) {
+            row.classList.add("highlight");
+          }
+
+          // 累加總剩餘車位
+          if (typeof data.carEmpty === "number") {
+            totalEmpty += data.carEmpty;
+          }
+
+          row.appendChild(nameCell);
+          row.appendChild(carEmptyCell);
+          tableBody.appendChild(row);
+        } catch (error) {
+          console.error("抓取失敗:", error);
+        }
+      }
+
+      // 更新最後更新時間
+      const now = new Date();
+      const formatted = now.getFullYear() + "-" +
+                        String(now.getMonth() + 1).padStart(2, '0') + "-" +
+                        String(now.getDate()).padStart(2, '0') + " " +
+                        String(now.getHours()).padStart(2, '0') + ":" +
+                        String(now.getMinutes()).padStart(2, '0') + ":" +
+                        String(now.getSeconds()).padStart(2, '0');
+      lastUpdateDiv.textContent = "最後更新時間：" + formatted;
+
+      // 更新總剩餘車位數
+      totalEmptyDiv.textContent = "總剩餘車位數：" + totalEmpty;
+
+      // 重設倒數
+      countdown = 30;
+      countdownDiv.textContent = "下次更新剩餘秒數：" + countdown;
+      clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        countdown--;
+        if (countdown <= 0) {
+          clearInterval(countdownTimer);
+        }
+        countdownDiv.textContent = "下次更新剩餘秒數：" + countdown;
+      }, 1000);
+    }
+
+    // 初次載入
+    fetchData();
+    // 每30秒更新一次
+    setInterval(fetchData, 30000);
+  </script>
+</body>
+</html>
