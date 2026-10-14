@@ -1,154 +1,709 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>車位資訊</title>
-  <style>
-    /* 基準字體大小：隨螢幕寬度縮放，最小16px，最大32px */
-    html {
-      font-size: clamp(16px, 4vw, 32px);
-    }
+<meta charset="UTF-8">
+<title>陽明山停車場即時資訊</title>
 
-    body { 
-      font-family: Arial, sans-serif; 
-      font-size: 1rem; /* 相對於 html 的字體大小 */
-      padding: 1em;
-    }
+<style>
+html{
+    font-size:clamp(16px,4vw,32px);
+}
 
-    .table-container {
-      width: 100%;
-      overflow-x: auto; /* 允許橫向滑動 */
-      max-height: 60vh; /* 限制高度，方便垂直滾動 */
-    }
+body{
+    font-family:Arial,sans-serif;
+    font-size:1rem;
+    padding:1em;
+}
 
-    table { 
-      border-collapse: collapse; 
-      width: 100%; 
-      margin-top: 1em; 
-      font-size: 1.2rem; /* 表格字體比正文稍大 */
-      min-width: 300px; 
-    }
+h1{
+    margin-top:0.3em;
+    margin-bottom:0.3em;
+}
 
-    th, td { 
-      border: 1px solid #ccc; 
-      padding: 0.5em; 
-      text-align: left; 
-      white-space: nowrap; 
-    }
+.table-container{
+    width:100%;
+    overflow-x:auto;
+    max-height:60vh;
+}
 
-    th { 
-      background-color: #f2f2f2; 
-      position: sticky; 
-      padding: 0.3em; 
-      top: 0; 
-      z-index: 2; 
-    }
+table{
+    border-collapse:collapse;
+    width:100%;
+    margin-top:1em;
+    font-size:1.2rem;
+    min-width:300px;
+}
 
-    td:first-child, th:first-child {
-      position: sticky;
-      left: 0;
-      background-color: #fff;
-      z-index: 1;
-    }
+th,td{
+    border:1px solid #ccc;
+    padding:0.5em;
+    text-align:left;
+    white-space:nowrap;
+}
 
-    th:first-child {
-      z-index: 3;
-    }
+th{
+    background:#f2f2f2;
+    position:sticky;
+    top:0;
+    z-index:2;
+}
 
-    #lastUpdate, #countdown, #totalEmpty { 
-      margin-top: 0.8em; 
-      font-size: 0.9rem; 
-      color: #333; 
-    }
+td:first-child,
+th:first-child{
+    position:sticky;
+    left:0;
+    background:#fff;
+    z-index:1;
+}
 
-    .highlight { 
-      background-color: #ffcccc; 
-      font-weight: bold; 
-    }
-  </style>
+th:first-child{
+    z-index:3;
+}
+
+.highlight{
+    background:#ffcccc;
+    font-weight:bold;
+}
+
+button{
+    margin-top:0.5em;
+    margin-right:0.5em;
+    padding:0.5em 1em;
+    font-size:0.9rem;
+    cursor:pointer;
+}
+
+#lastUpdate,
+#countdown,
+#totalEmpty,
+#recordCount{
+    margin-top:0.8em;
+    font-size:0.9rem;
+    color:#333;
+}
+</style>
 </head>
+
 <body>
-  <h1>陽明山停車場即時資訊</h1>
-  <div class="table-container">
-    <table id="parkingTable">
-      <thead>
-        <tr>
-          <th>名稱</th>
-          <th>剩餘車位</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-  <div id="lastUpdate">最後更新時間：尚未更新</div>
-  <div id="countdown">下次更新剩餘秒數：30</div>
-  <div id="totalEmpty">總剩餘車位數：尚未計算</div>
 
-  <script>
-    const siteIds = [40908, 40909, 40910, 40911, 40912];
-    const tableBody = document.querySelector("#parkingTable tbody");
-    const lastUpdateDiv = document.getElementById("lastUpdate");
-    const countdownDiv = document.getElementById("countdown");
-    const totalEmptyDiv = document.getElementById("totalEmpty");
-    let countdown = 30;
-    let countdownTimer;
+<h1>陽明山停車場即時資訊</h1>
 
-    async function fetchData() {
-      tableBody.innerHTML = ""; 
-      let totalEmpty = 0;
+<button onclick="exportCSV()">
+📥 下載CSV並清空資料
+</button>
 
-      for (const id of siteIds) {
-        try {
-          const response = await fetch(`https://ymsnpapi.altob.com.tw/api/Map/Get?siteId=${id}`);
-          const data = await response.json();
-          const row = document.createElement("tr");
-          const nameCell = document.createElement("td");
-          const carEmptyCell = document.createElement("td");
+<div class="table-container">
+<table id="parkingTable">
+<thead>
+<tr>
+<th>名稱</th>
+<th>剩餘車位</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
 
-          nameCell.textContent = data.name || "未知";
-          carEmptyCell.textContent = data.carEmpty ?? "N/A";
+<div id="lastUpdate">最後更新時間：尚未更新</div>
+<div id="countdown">下次更新剩餘秒數：30</div>
+<div id="totalEmpty">總剩餘車位數：尚未計算</div>
+<div id="recordCount">累積歷史筆數：0</div>
 
-          if (typeof data.carEmpty === "number" && data.carEmpty < 5) {
-            row.classList.add("highlight");
-          }
+<script>
 
-          if (typeof data.carEmpty === "number") {
-            totalEmpty += data.carEmpty;
-          }
+const siteIds=[
+40908,
+40909,
+40910,
+40911,
+40912
+];
 
-          row.appendChild(nameCell);
-          row.appendChild(carEmptyCell);
-          tableBody.appendChild(row);
-        } catch (error) {
-          console.error("抓取失敗:", error);
+const DB_NAME="YMSParkingDB";
+const HISTORY_STORE="history";
+const STATE_STORE="state";
+
+const tableBody=
+document.querySelector("#parkingTable tbody");
+
+const lastUpdateDiv=
+document.getElementById("lastUpdate");
+
+const countdownDiv=
+document.getElementById("countdown");
+
+const totalEmptyDiv=
+document.getElementById("totalEmpty");
+
+const recordCountDiv=
+document.getElementById("recordCount");
+
+let countdown=30;
+let countdownTimer;
+
+
+/* ==========================
+   DB
+========================== */
+
+function openDB(){
+
+    return new Promise((resolve,reject)=>{
+
+        const req=
+        indexedDB.open(DB_NAME,2);
+
+        req.onupgradeneeded=(e)=>{
+
+            const db=e.target.result;
+
+            if(
+                !db.objectStoreNames.contains(
+                    HISTORY_STORE
+                )
+            ){
+                db.createObjectStore(
+                    HISTORY_STORE,
+                    {
+                        keyPath:"id",
+                        autoIncrement:true
+                    }
+                );
+            }
+
+            if(
+                !db.objectStoreNames.contains(
+                    STATE_STORE
+                )
+            ){
+                db.createObjectStore(
+                    STATE_STORE,
+                    {
+                        keyPath:"siteId"
+                    }
+                );
+            }
+        };
+
+        req.onsuccess=
+        ()=>resolve(req.result);
+
+        req.onerror=
+        ()=>reject(req.error);
+
+    });
+}
+
+/* ==========================
+   CSV安全轉義
+========================== */
+
+function escapeCSV(value){
+
+    if(
+        value===null ||
+        value===undefined
+    ){
+        return "";
+    }
+
+    return '"' +
+           String(value)
+           .replace(/"/g,'""')
+           +
+           '"';
+}
+
+/* ==========================
+   state
+========================== */
+
+async function getLastValue(siteId){
+
+    const db=
+    await openDB();
+
+    return new Promise((resolve)=>{
+
+        const tx=
+        db.transaction(
+            STATE_STORE,
+            "readonly"
+        );
+
+        const req=
+        tx.objectStore(
+            STATE_STORE
+        ).get(siteId);
+
+        req.onsuccess=()=>{
+
+            resolve(
+                req.result
+                ? req.result.carEmpty
+                : null
+            );
+        };
+
+        req.onerror=()=>{
+            resolve(null);
+        };
+
+    });
+}
+
+async function setLastValue(
+    siteId,
+    carEmpty
+){
+
+    const db=
+    await openDB();
+
+    const tx=
+    db.transaction(
+        STATE_STORE,
+        "readwrite"
+    );
+
+    tx.objectStore(
+        STATE_STORE
+    ).put({
+        siteId,
+        carEmpty,
+        updateTime:Date.now()
+    });
+}
+
+/* ==========================
+   history
+========================== */
+
+async function saveRecord(
+    siteId,
+    name,
+    previousValue,
+    carEmpty
+){
+
+    const db=
+    await openDB();
+
+    const tx=
+    db.transaction(
+        HISTORY_STORE,
+        "readwrite"
+    );
+
+    tx.objectStore(
+        HISTORY_STORE
+    ).add({
+
+        timestamp:Date.now(),
+        siteId,
+        name,
+        previousValue,
+        carEmpty
+
+    });
+
+    updateRecordCount();
+}
+
+async function updateRecordCount(){
+
+    const db=
+    await openDB();
+
+    const tx=
+    db.transaction(
+        HISTORY_STORE,
+        "readonly"
+    );
+
+    const req=
+    tx.objectStore(
+        HISTORY_STORE
+    ).count();
+
+    req.onsuccess=()=>{
+
+        recordCountDiv.textContent=
+        "累積歷史筆數："+req.result;
+    };
+}
+
+/* ==========================
+   90天清理
+========================== */
+
+async function cleanupOldData(){
+
+    const db=
+    await openDB();
+
+    const tx=
+    db.transaction(
+        HISTORY_STORE,
+        "readwrite"
+    );
+
+    const store=
+    tx.objectStore(
+        HISTORY_STORE
+    );
+
+    const limit=
+    Date.now()
+    -(90*24*60*60*1000);
+
+    store.openCursor().onsuccess=
+    function(event){
+
+        const cursor=
+        event.target.result;
+
+        if(!cursor){
+            return;
         }
-      }
 
-      const now = new Date();
-      const formatted = now.getFullYear() + "-" +
-                        String(now.getMonth() + 1).padStart(2, '0') + "-" +
-                        String(now.getDate()).padStart(2, '0') + " " +
-                        String(now.getHours()).padStart(2, '0') + ":" +
-                        String(now.getMinutes()).padStart(2, '0') + ":" +
-                        String(now.getSeconds()).padStart(2, '0');
-      lastUpdateDiv.textContent = "最後更新時間：" + formatted;
+        if(
+            cursor.value.timestamp
+            < limit
+        ){
+            cursor.delete();
+        }
 
-      totalEmptyDiv.textContent = "總剩餘車位數：" + totalEmpty;
+        cursor.continue();
+    };
+}
 
-      countdown = 30;
-      countdownDiv.textContent = "下次更新剩餘秒數：" + countdown;
-      clearInterval(countdownTimer);
-      countdownTimer = setInterval(() => {
+/* ==========================
+   clear
+========================== */
+
+async function clearDatabase(){
+
+    const db=
+    await openDB();
+
+    let tx=
+    db.transaction(
+        HISTORY_STORE,
+        "readwrite"
+    );
+
+    tx.objectStore(
+        HISTORY_STORE
+    ).clear();
+
+    tx=
+    db.transaction(
+        STATE_STORE,
+        "readwrite"
+    );
+
+    tx.objectStore(
+        STATE_STORE
+    ).clear();
+
+    updateRecordCount();
+}
+
+/* ==========================
+   export csv
+========================== */
+
+async function exportCSV(){
+
+    if(
+        !confirm(
+            "下載CSV後將清空資料，是否繼續？"
+        )
+    ){
+        return;
+    }
+
+    const db=
+    await openDB();
+
+    const tx=
+    db.transaction(
+        HISTORY_STORE,
+        "readonly"
+    );
+
+    const store=
+    tx.objectStore(
+        HISTORY_STORE
+    );
+
+    const req=
+    store.getAll();
+
+    req.onsuccess=
+    async ()=>{
+
+        const rows=
+        req.result;
+
+        let csv=
+        "timestamp,siteId,name,previousValue,carEmpty\n";
+
+        rows.forEach(r=>{
+
+            csv+=
+            [
+                escapeCSV(
+                    new Date(
+                        r.timestamp
+                    ).toISOString()
+                ),
+                escapeCSV(r.siteId),
+                escapeCSV(r.name),
+                escapeCSV(r.previousValue),
+                escapeCSV(r.carEmpty)
+            ].join(",")
+            + "\n";
+
+        });
+
+        const BOM="\uFEFF";
+
+        const blob=
+        new Blob(
+            [
+                BOM+csv
+            ],
+            {
+                type:
+                "text/csv;charset=utf-8"
+            }
+        );
+
+        const link=
+        document.createElement("a");
+
+        link.href=
+        URL.createObjectURL(blob);
+
+        link.download=
+        "YMSParking_"
+        +
+        new Date()
+        .toISOString()
+        .replaceAll(":","-")
+        +
+        ".csv";
+
+        document.body.appendChild(
+            link
+        );
+
+        link.click();
+
+        link.remove();
+
+        await clearDatabase();
+
+        alert(
+            "CSV已下載，資料已清空"
+        );
+    };
+}
+
+/* ==========================
+   API
+========================== */
+
+async function fetchData(){
+
+    await cleanupOldData();
+
+    tableBody.innerHTML="";
+
+    let totalEmpty=0;
+
+    for(const id of siteIds){
+
+        try{
+
+            const response=
+            await fetch(
+                `https://ymsnpapi.altob.com.tw/api/Map/Get?siteId=${id}`
+            );
+
+            const data=
+            await response.json();
+
+            const row=
+            document.createElement("tr");
+
+            const nameCell=
+            document.createElement("td");
+
+            const emptyCell=
+            document.createElement("td");
+
+            nameCell.textContent=
+            data.name || "未知";
+
+            emptyCell.textContent=
+            data.carEmpty ?? "N/A";
+
+            if(
+                typeof data.carEmpty==="number"
+                &&
+                data.carEmpty < 5
+            ){
+                row.classList.add(
+                    "highlight"
+                );
+            }
+
+            if(
+                typeof data.carEmpty==="number"
+            ){
+
+                totalEmpty+=
+                data.carEmpty;
+
+                const previous=
+                await getLastValue(id);
+
+                const current=
+                data.carEmpty;
+
+                if(
+                    previous===null
+                    ||
+                    previous!==current
+                ){
+
+                    await saveRecord(
+                        id,
+                        data.name,
+                        previous,
+                        current
+                    );
+
+                    await setLastValue(
+                        id,
+                        current
+                    );
+                }
+            }
+
+            row.appendChild(
+                nameCell
+            );
+
+            row.appendChild(
+                emptyCell
+            );
+
+            tableBody.appendChild(
+                row
+            );
+
+        }
+        catch(error){
+
+            console.error(
+                "抓取失敗",
+                error
+            );
+        }
+    }
+
+    totalEmptyDiv.textContent=
+    "總剩餘車位數："+totalEmpty;
+
+    const now=
+    new Date();
+
+    lastUpdateDiv.textContent=
+    "最後更新時間："
+    +
+    now.getFullYear()
+    + "-"
+    + String(
+        now.getMonth()+1
+    ).padStart(2,"0")
+    + "-"
+    + String(
+        now.getDate()
+    ).padStart(2,"0")
+    + " "
+    + String(
+        now.getHours()
+    ).padStart(2,"0")
+    + ":"
+    + String(
+        now.getMinutes()
+    ).padStart(2,"0")
+    + ":"
+    + String(
+        now.getSeconds()
+    ).padStart(2,"0");
+
+    countdown=30;
+
+    clearInterval(
+        countdownTimer
+    );
+
+    countdownDiv.textContent=
+    "下次更新剩餘秒數："+countdown;
+
+    countdownTimer=
+    setInterval(()=>{
+
         countdown--;
-        if (countdown <= 0) {
-          clearInterval(countdownTimer);
+
+        countdownDiv.textContent=
+        "下次更新剩餘秒數："+countdown;
+
+        if(
+            countdown<=0
+        ){
+            clearInterval(
+                countdownTimer
+            );
         }
-        countdownDiv.textContent = "下次更新剩餘秒數：" + countdown;
-      }, 1000);
+
+    },1000);
+}
+
+/* ==========================
+   startup
+========================== */
+
+(async()=>{
+
+    await updateRecordCount();
+
+    const params=
+    new URLSearchParams(
+        location.search
+    );
+
+    if(
+        params.get("output")==="1"
+    ){
+        exportCSV();
+        return;
     }
 
     fetchData();
-    setInterval(fetchData, 30000);
-  </script>
+
+    setInterval(
+        fetchData,
+        30000
+    );
+
+})();
+</script>
+
 </body>
 </html>
