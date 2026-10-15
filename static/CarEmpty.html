@@ -121,6 +121,7 @@ th:first-child{
 <div id="recordCount" class="info">
 快照筆數：0
 </div>
+<script>      
 /*
 ==========================================================
 
@@ -164,6 +165,11 @@ th:first-child{
      p40912
 
    因此資料量遠小於固定週期紀錄。
+   狀態(state)資料僅保存最新車位數，
+用於判斷是否產生變動。
+
+快照(snapshot)資料則保存歷史紀錄，
+供 CSV 匯出與後續分析使用。
 
 4. 自動保留最近 90 天資料
 
@@ -255,7 +261,7 @@ th:first-child{
 
 ==========================================================
 */
-<script>
+
 const siteIds=[
 40908,
 40909,
@@ -426,78 +432,108 @@ async function saveSnapshot(
    State Store
 ===================================== */
 
-async function getLastValue(
-    siteId
+
+
+async function saveStates(
+    nowTs,
+    values
 ){
 
     const db =
         await openDB();
 
-    return new Promise(
-        resolve => {
+    return new Promise((resolve, reject) => {
 
-            const tx =
-                db.transaction(
-                    STATE_STORE,
-                    "readonly"
-                );
+        const tx =
+            db.transaction(
+                STATE_STORE,
+                "readwrite"
+            );
 
-            const req =
-                tx.objectStore(
-                    STATE_STORE
-                ).get(siteId);
+        const store =
+            tx.objectStore(
+                STATE_STORE
+            );
 
-            req.onsuccess =
-                () => {
+        for(const id of siteIds){
 
-                    resolve(
-                        req.result
-                            ? req.result.carEmpty
-                            : null
-                    );
+            if(
+                values[id]
+                === undefined
+            ){
+                continue;
+            }
 
-                };
+            store.put({
 
-            req.onerror =
-                () => resolve(null);
+                siteId: id,
+
+                carEmpty:
+                    values[id],
+
+                updateTime:
+                    nowTs
+
+            });
 
         }
-    );
 
-}
+        tx.oncomplete =
+            () => resolve();
 
+        tx.onerror =
+            () => reject(tx.error);
 
-async function setLastValue(
-      nowTs,
-    siteId,
-    carEmpty
-){
+        tx.onabort =
+            () => reject(tx.error);
+
+    });
+
+}      
+
+async function getAllStates(){
 
     const db =
         await openDB();
 
-    const tx =
-        db.transaction(
-            STATE_STORE,
-            "readwrite"
-        );
+    return new Promise((resolve, reject)=>{
 
-    tx.objectStore(
-        STATE_STORE
-    ).put({
+        const tx =
+            db.transaction(
+                STATE_STORE,
+                "readonly"
+            );
 
-        siteId,
+        const req =
+            tx.objectStore(
+                STATE_STORE
+            ).getAll();
 
-        carEmpty,
+        req.onsuccess =
+            ()=>{
 
-        updateTime:
-            nowTs
+                const states = {};
+
+                req.result.forEach(item=>{
+
+                    states[
+                        item.siteId
+                    ] =
+                    item.carEmpty;
+
+                });
+
+                resolve(states);
+
+            };
+
+        req.onerror =
+            ()=>reject(req.error);
 
     });
 
 }
-
-
+      
 /* =====================================
    Record Count
 ===================================== */
@@ -593,7 +629,7 @@ return new Promise(
             tx.oncomplete =
             async ()=>{
 
-                await updateRecordCount();
+                
 
                 resolve();
             };
@@ -644,9 +680,6 @@ const db =
             () => reject(tx.error);
 
     });
-
-    recordCountDiv.textContent =
-        "快照筆數：0";
 
     await updateRecordCount();
 }
@@ -714,29 +747,28 @@ async function exportCSV(skipConfirm = false){
                 b.timestamp
         );
 
-        //let csv =
-        //"timestamp,totalEmpty,p40908,p40909,p40910,p40911,p40912\n";
         let csv =
             [
                 "timestamp",
                 "totalEmpty",
-                ...siteIds.map(id => parkingInfo[id] || `p${id}`),
                   "日期",
                 "星期",
-                "小時"
+                "小時",
+                ...siteIds.map(id => parkingInfo[id] || `p${id}`)
+                  
            ].join(",")
            + "\n";
         rows.forEach(r=>{
+              const dt =
+    new Date(r.timestamp);
             let taipeiDate = new Date(
-    new Date(r.timestamp).toLocaleString(
+    dt.toLocaleString(
         "en-US",
         {
             timeZone: "Asia/Taipei"
         }
     ));
-              let taipeiTime = new Date(
-                        r.timestamp
-                    ).toLocaleString("sv-SE", {
+              let taipeiTime = dt.toLocaleString("sv-SE", {
                         timeZone: "Asia/Taipei"
                     })
             csv += [
@@ -748,7 +780,15 @@ async function exportCSV(skipConfirm = false){
                 escapeCSV(
                     r.totalEmpty
                 ),
-
+escapeCSV(
+                    taipeiTime.substring(0, 10)
+                ),  
+                escapeCSV(
+                    WEEKDAY_NAMES[taipeiDate.getDay()]
+                ),
+                escapeCSV(
+                    taipeiDate.getHours()
+                ),
                 escapeCSV(
                     r.p40908
                 ),
@@ -767,16 +807,8 @@ async function exportCSV(skipConfirm = false){
 
                 escapeCSV(
                     r.p40912
-                ),
-                escapeCSV(
-                    taipeiTime.substring(0, 10)
-                ),  
-                escapeCSV(
-                    WEEKDAY_NAMES[taipeiDate.getDay()]
-                ),
-                escapeCSV(
-                    taipeiDate.getHours()
                 )
+                
 
             ].join(",")
 
@@ -977,7 +1009,8 @@ async function fetchData(){
     /* -------- 檢查是否有變動 -------- */
 
     let changed = false;
-
+const previousStates =
+    await getAllStates();
     for(const id of siteIds){
 
         if(
@@ -987,14 +1020,14 @@ async function fetchData(){
             continue;
         }
 
-        const previous =
-            await getLastValue(id);
+        const previous =   previousStates[id];
+
 
         const current =
             currentValues[id];
 
         if(
-            previous === null
+            previous == null
             ||
             previous !== current
         ){
@@ -1016,23 +1049,10 @@ async function fetchData(){
             currentValues
         );
 
-        for(const id of siteIds){
-
-            if(
-                currentValues[id]
-                !== undefined
-            ){
-
-                await setLastValue(
-                      nowTs,
-                    id,
-                    currentValues[id]
-                );
-
-            }
-
-        }
-
+        await saveStates(
+    nowTs,
+    currentValues
+);
         await updateRecordCount();
 
     }
