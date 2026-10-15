@@ -173,9 +173,11 @@ document.getElementById(
 
 let countdown=30;
 let countdownTimer;
-
+let dbPromise = null;
 function openDB(){
-
+if(dbPromise){
+        return dbPromise;
+    }
  return new Promise(
  (resolve,reject)=>{
 
