@@ -538,7 +538,9 @@ async function exportCSV(){
                 escapeCSV(
                     new Date(
                         r.timestamp
-                    ).toISOString()
+                    ).toLocaleString("sv-SE", {
+                        timeZone: "Asia/Taipei"
+                    })
                 ),
 
                 escapeCSV(
