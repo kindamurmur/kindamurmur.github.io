@@ -530,15 +530,15 @@ async function exportCSV(){
                 b.timestamp
         );
 
+        //let csv =
+        //"timestamp,totalEmpty,p40908,p40909,p40910,p40911,p40912\n";
         let csv =
-        "timestamp,totalEmpty,p40908,p40909,p40910,p40911,p40912\n";
-        let csv =
-        [
-            "timestamp",
-            "totalEmpty",
-            ...parkingIds.map(id => parkingInfo[id] || `p${id}`)
-       ].join(",")
-    + "\n";
+            [
+                "timestamp",
+                "totalEmpty",
+                ...parkingIds.map(id => parkingInfo[id] || `p${id}`)
+           ].join(",")
+           + "\n";
         rows.forEach(r=>{
 
             csv += [
