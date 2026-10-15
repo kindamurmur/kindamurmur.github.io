@@ -520,10 +520,10 @@ function escapeCSV(value){
    Export CSV
 ===================================== */
 
-async function exportCSV(){
+async function exportCSV(skipConfirm = false){
 
     if(
-        !confirm(
+        !skipConfirm &&!confirm(
             "下載CSV後將清空資料，是否繼續？"
         )
     ){
@@ -566,6 +566,7 @@ async function exportCSV(){
                 "timestamp",
                 "totalEmpty",
                 ...siteIds.map(id => parkingInfo[id] || `p${id}`),
+                  "日期",
                 "星期",
                 "小時"
            ].join(",")
@@ -578,14 +579,15 @@ async function exportCSV(){
             timeZone: "Asia/Taipei"
         }
     ));
-            csv += [
-
-                escapeCSV(
-                    new Date(
+              let taipeiTime = new Date(
                         r.timestamp
                     ).toLocaleString("sv-SE", {
                         timeZone: "Asia/Taipei"
                     })
+            csv += [
+
+                escapeCSV(
+                    taipeiTime
                 ),
 
                 escapeCSV(
@@ -611,6 +613,9 @@ async function exportCSV(){
                 escapeCSV(
                     r.p40912
                 ),
+                escapeCSV(
+                    taipeiTime.substring(0, 10);
+                ),  
                 escapeCSV(
                     WEEKDAY_NAMES[taipeiDate.getDay()]
                 ),
@@ -715,7 +720,7 @@ async function handleOutputMode(){
         ) === "1"
     ){
 
-        await exportCSV();
+        await exportCSV(true);
 
         return true;
     }
