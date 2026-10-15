@@ -536,7 +536,7 @@ async function exportCSV(){
             [
                 "timestamp",
                 "totalEmpty",
-                ...parkingIds.map(id => parkingInfo[id] || `p${id}`)
+                ...siteIds.map(id => parkingInfo[id] || `p${id}`)
            ].join(",")
            + "\n";
         rows.forEach(r=>{
