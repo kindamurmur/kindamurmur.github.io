@@ -121,7 +121,140 @@ th:first-child{
 <div id="recordCount" class="info">
 快照筆數：0
 </div>
+/*
+==========================================================
 
+陽明山停車場即時資訊監測
+
+功能說明
+----------------------------------------------------------
+
+1. 即時顯示陽明山 5 個停車場剩餘車位
+
+   - 30 秒更新一次
+   - 顯示停車場名稱及剩餘車位
+   - 剩餘車位小於 5 時紅色標示
+
+2. 自動累積歷史資料
+
+   使用 IndexedDB 保存在瀏覽器本機：
+
+   Database:
+     YMSParkingDB
+
+   Stores:
+     snapshots
+     state
+
+3. 快照儲存機制
+
+   每次更新後，比對前次車位數。
+
+   只有當任一停車場車位數變動時，
+   才寫入一筆 Snapshot。
+
+   Snapshot 格式：
+
+     timestamp
+     totalEmpty
+     p40908
+     p40909
+     p40910
+     p40911
+     p40912
+
+   因此資料量遠小於固定週期紀錄。
+
+4. 自動保留最近 90 天資料
+
+   每次更新前：
+
+     cleanupOldData()
+
+   自動刪除超過 90 天的歷史快照。
+
+5. CSV 匯出
+
+   按下：
+
+     下載 CSV 並清空資料
+
+   會：
+
+     1. 匯出 UTF-8 BOM CSV
+     2. 依時間排序
+     3. 清空 IndexedDB
+
+6. CSV 欄位
+
+   timestamp  台北時間(UTC+8)
+   totalEmpty 五場總剩餘車位
+   各停車場剩餘車位
+   日期
+   星期
+   小時
+
+   範例：
+
+   timestamp,totalEmpty,...
+   2026-10-15 09:30:00,128,...
+
+7. 時區
+
+   CSV 中：
+
+     timestamp
+     日期
+     星期
+     小時
+
+   全部使用：
+
+     Asia/Taipei (UTC+8)
+
+   方便 Excel / Power BI 分析。
+
+8. output=1
+
+   網址加入：
+
+     ?output=1
+
+   例如：
+
+     CarEmpty.html?output=1
+
+   可直接匯出 CSV 並清空資料，
+   不需手動點按鈕。
+
+9. IndexedDB 版本
+
+   DB_VERSION = 10
+
+   未來若調整資料結構：
+
+     DB_VERSION++
+
+   即可自動升級資料庫。
+
+10. 分析用途
+
+   匯出的 CSV 可直接用於：
+
+     - Excel
+     - Power BI
+     - Python Pandas
+
+   常見分析：
+
+     - 尖峰時段
+     - 平日/假日差異
+     - 滿位預警
+     - 車流趨勢
+     - 停車場使用率
+
+==========================================================
+*/
 <script>
 const siteIds=[
 40908,
@@ -235,7 +368,7 @@ if(dbPromise){
 ===================================== */
 
 async function saveSnapshot(
-      nowTs,
+    nowTs,
     totalEmpty,
     values
 ){
@@ -243,40 +376,51 @@ async function saveSnapshot(
     const db =
         await openDB();
 
-    const tx =
-        db.transaction(
-            SNAPSHOT_STORE,
-            "readwrite"
-        );
+    return new Promise((resolve, reject) => {
 
-    tx.objectStore(
-        SNAPSHOT_STORE
-    ).add({
+        const tx =
+            db.transaction(
+                SNAPSHOT_STORE,
+                "readwrite"
+            );
 
-        timestamp:
-            nowTs,
+        tx.objectStore(
+            SNAPSHOT_STORE
+        ).add({
 
-        totalEmpty,
+            timestamp: nowTs,
 
-        p40908:
-            values[40908] ?? null,
+            totalEmpty,
 
-        p40909:
-            values[40909] ?? null,
+            p40908:
+                values[40908] ?? null,
 
-        p40910:
-            values[40910] ?? null,
+            p40909:
+                values[40909] ?? null,
 
-        p40911:
-            values[40911] ?? null,
+            p40910:
+                values[40910] ?? null,
 
-        p40912:
-            values[40912] ?? null
+            p40911:
+                values[40911] ?? null,
+
+            p40912:
+                values[40912] ?? null
+
+        });
+
+        tx.oncomplete =
+            () => resolve();
+
+        tx.onerror =
+            () => reject(tx.error);
+
+        tx.onabort =
+            () => reject(tx.error);
 
     });
 
 }
-
 
 /* =====================================
    State Store
