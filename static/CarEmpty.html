@@ -178,7 +178,7 @@ function openDB(){
 if(dbPromise){
         return dbPromise;
     }
- return new Promise(
+ dbPromise = new Promise(
  (resolve,reject)=>{
 
   const req=
@@ -228,13 +228,14 @@ if(dbPromise){
   ()=>reject(req.error);
 
  });
-
+ return dbPromise;
 }
 /* =====================================
    Snapshot Store
 ===================================== */
 
 async function saveSnapshot(
+      nowTs,
     totalEmpty,
     values
 ){
@@ -253,7 +254,7 @@ async function saveSnapshot(
     ).add({
 
         timestamp:
-            Date.now(),
+            nowTs,
 
         totalEmpty,
 
@@ -323,6 +324,7 @@ async function getLastValue(
 
 
 async function setLastValue(
+      nowTs,
     siteId,
     carEmpty
 ){
@@ -345,7 +347,7 @@ async function setLastValue(
         carEmpty,
 
         updateTime:
-            Date.now()
+            nowTs
 
     });
 
@@ -614,7 +616,7 @@ async function exportCSV(skipConfirm = false){
                     r.p40912
                 ),
                 escapeCSV(
-                    taipeiTime.substring(0, 10);
+                    taipeiTime.substring(0, 10)
                 ),  
                 escapeCSV(
                     WEEKDAY_NAMES[taipeiDate.getDay()]
@@ -854,8 +856,9 @@ async function fetchData(){
     /* -------- 有變動才存快照 -------- */
 
     if(changed){
-
+      const nowTs = Date.now();
         await saveSnapshot(
+              nowTs,
             totalEmpty,
             currentValues
         );
@@ -868,6 +871,7 @@ async function fetchData(){
             ){
 
                 await setLastValue(
+                      nowTS,
                     id,
                     currentValues[id]
                 );
