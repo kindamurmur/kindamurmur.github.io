@@ -471,31 +471,40 @@ return new Promise(
 
 async function clearDatabase(){
 
-    const db =
+const db =
         await openDB();
 
-    let tx =
-        db.transaction(
-            SNAPSHOT_STORE,
-            "readwrite"
-        );
+    await new Promise((resolve, reject) => {
 
-    tx.objectStore(
-        SNAPSHOT_STORE
-    ).clear();
+        const tx =
+            db.transaction(
+                [SNAPSHOT_STORE, STATE_STORE],
+                "readwrite"
+            );
 
-    tx =
-        db.transaction(
-            STATE_STORE,
-            "readwrite"
-        );
+        tx.objectStore(
+            SNAPSHOT_STORE
+        ).clear();
 
-    tx.objectStore(
-        STATE_STORE
-    ).clear();
+        tx.objectStore(
+            STATE_STORE
+        ).clear();
+
+        tx.oncomplete =
+            () => resolve();
+
+        tx.onerror =
+            () => reject(tx.error);
+
+        tx.onabort =
+            () => reject(tx.error);
+
+    });
+
+    recordCountDiv.textContent =
+        "快照筆數：0";
 
     await updateRecordCount();
-
 }
 /* =====================================
    CSV Escape
@@ -655,19 +664,19 @@ async function exportCSV(skipConfirm = false){
             URL.createObjectURL(
                 blob
             );
-
-        link.download =
-            "YMSParking_"
-            +
-            new Date()
-            .toISOString()
-            .replaceAll(
-                ":",
-                "-"
-            )
-            +
-            ".csv";
-
+const exportTime =
+    new Date().toLocaleString(
+        "sv-SE",
+        {
+            timeZone:
+                "Asia/Taipei"
+        }
+    )
+    .replaceAll(" ","_")
+    .replaceAll(":","-");
+          link.download =
+    `YMSParking_${exportTime}.csv`;
+        
         document.body.appendChild(
             link
         );
@@ -871,7 +880,7 @@ async function fetchData(){
             ){
 
                 await setLastValue(
-                      nowTS,
+                      nowTs,
                     id,
                     currentValues[id]
                 );
