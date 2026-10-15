@@ -132,7 +132,15 @@ const siteIds=[
 ];
 
 const parkingInfo = {};
-      
+const WEEKDAY_NAMES = [
+    "星期日",
+    "星期一",
+    "星期二",
+    "星期三",
+    "星期四",
+    "星期五",
+    "星期六"
+];      
 const DB_NAME="YMSParkingDB";
 const SNAPSHOT_STORE="snapshots";
 const STATE_STORE="state";
@@ -536,11 +544,19 @@ async function exportCSV(){
             [
                 "timestamp",
                 "totalEmpty",
-                ...siteIds.map(id => parkingInfo[id] || `p${id}`)
+                ...siteIds.map(id => parkingInfo[id] || `p${id}`),
+                "星期",
+                "小時"
            ].join(",")
            + "\n";
         rows.forEach(r=>{
-
+            let taipeiDate = new Date(
+    new Date(r.timestamp).toLocaleString(
+        "en-US",
+        {
+            timeZone: "Asia/Taipei"
+        }
+    ));
             csv += [
 
                 escapeCSV(
@@ -573,6 +589,12 @@ async function exportCSV(){
 
                 escapeCSV(
                     r.p40912
+                ),
+                escapeCSV(
+                    WEEKDAY_NAMES[taipeiDate.getDay()]
+                ),
+                escapeCSV(
+                    taipeiDate.getHours()
                 )
 
             ].join(",")
