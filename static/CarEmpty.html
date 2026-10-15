@@ -1,161 +1,132 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport"
-      content="width=device-width,initial-scale=1">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-<title>陽明山停車場即時資訊</title>
+    <title>陽明山停車場即時資訊</title>
 
-<style>
+    <style>
+      html {
+        font-size: clamp(16px, 4vw, 32px);
+      }
 
-html{
-    font-size:clamp(16px,4vw,32px);
-}
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 1rem;
+        padding: 1em;
+      }
 
-body{
-    font-family:Arial,sans-serif;
-    font-size:1rem;
-    padding:1em;
-}
+      h1 {
+        margin-top: 0.3em;
+        margin-bottom: 0.3em;
+      }
 
-h1{
-    margin-top:.3em;
-    margin-bottom:.3em;
-}
+      button {
+        margin: 0.5em 0;
+        padding: 0.5em 1em;
+        cursor: pointer;
+      }
 
-button{
-    margin:0.5em 0;
-    padding:.5em 1em;
-    cursor:pointer;
-}
+      .table-container {
+        width: 100%;
+        overflow-x: auto;
+        max-height: 60vh;
+      }
 
-.table-container{
-    width:100%;
-    overflow-x:auto;
-    max-height:60vh;
-}
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        margin-top: 1em;
+        min-width: 300px;
+      }
 
-table{
-    border-collapse:collapse;
-    width:100%;
-    margin-top:1em;
-    min-width:300px;
-}
+      th,
+      td {
+        border: 1px solid #ccc;
+        padding: 0.5em;
+        white-space: nowrap;
+      }
 
-th,
-td{
-    border:1px solid #ccc;
-    padding:.5em;
-    white-space:nowrap;
-}
+      th {
+        background: #f2f2f2;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+      }
 
-th{
-    background:#f2f2f2;
-    position:sticky;
-    top:0;
-    z-index:2;
-}
+      td:first-child,
+      th:first-child {
+        position: sticky;
+        left: 0;
+        background: white;
+        z-index: 1;
+      }
 
-td:first-child,
-th:first-child{
-    position:sticky;
-    left:0;
-    background:white;
-    z-index:1;
-}
+      th:first-child {
+        z-index: 3;
+      }
 
-th:first-child{
-    z-index:3;
-}
+      .highlight {
+        background: #ffcccc;
+        font-weight: bold;
+      }
 
-.highlight{
-    background:#ffcccc;
-    font-weight:bold;
-}
+      .info {
+        margin-top: 0.5em;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>陽明山停車場即時資訊</h1>
 
-.info{
-    margin-top:.5em;
-    font-size:.9rem;
-}
+    <button id="downloadBtn">下載 CSV 並清空資料</button>
 
-</style>
-</head>
-<body>
+    <div class="table-container">
+      <table id="parkingTable">
+        <thead>
+          <tr>
+            <th>名稱</th>
+            <th>剩餘車位</th>
+          </tr>
+        </thead>
 
-<h1>陽明山停車場即時資訊</h1>
+        <tbody></tbody>
+      </table>
+    </div>
 
-<button id="downloadBtn">
-下載 CSV 並清空資料
-</button>
+    <div id="lastUpdate" class="info">最後更新時間：尚未更新</div>
 
-<div class="table-container">
+    <div id="countdown" class="info">下次更新剩餘秒數：30</div>
 
-<table id="parkingTable">
+    <div id="totalEmpty" class="info">總剩餘車位數：0</div>
 
-<thead>
-<tr>
-<th>名稱</th>
-<th>剩餘車位</th>
-</tr>
-</thead>
-
-<tbody></tbody>
-
-</table>
-
-</div>
-
-<div id="lastUpdate" class="info">
-最後更新時間：尚未更新
-</div>
-
-<div id="countdown" class="info">
-下次更新剩餘秒數：30
-</div>
-
-<div id="totalEmpty" class="info">
-總剩餘車位數：0
-</div>
-
-<div id="recordCount" class="info">
-快照筆數：0
-</div>
-<script>      
-/*
+    <div id="recordCount" class="info">快照筆數：0</div>
+    <script>
+      /*
 ==========================================================
-
 陽明山停車場即時資訊監測
-
 功能說明
 ----------------------------------------------------------
-
 1. 即時顯示陽明山 5 個停車場剩餘車位
-
    - 30 秒更新一次
    - 顯示停車場名稱及剩餘車位
    - 剩餘車位小於 5 時紅色標示
 
 2. 自動累積歷史資料
-
    使用 IndexedDB 保存在瀏覽器本機：
-
    Database:
      YMSParkingDB
-
    Stores:
      snapshots
      state
 
 3. 快照儲存機制
-
    每次更新後，比對前次車位數。
-
    只有當任一停車場車位數變動時，
    才寫入一筆 Snapshot。
-
    Snapshot 格式：
-
      timestamp
      totalEmpty
      p40908
@@ -163,96 +134,65 @@ th:first-child{
      p40910
      p40911
      p40912
-
    因此資料量遠小於固定週期紀錄。
    狀態(state)資料僅保存最新車位數，
-用於判斷是否產生變動。
-
-快照(snapshot)資料則保存歷史紀錄，
-供 CSV 匯出與後續分析使用。
+   用於判斷是否產生變動。
+   快照(snapshot)資料則保存歷史紀錄，
+   供 CSV 匯出與後續分析使用。
 
 4. 自動保留最近 90 天資料
-
    每次更新前：
-
      cleanupOldData()
-
    自動刪除超過 90 天的歷史快照。
 
 5. CSV 匯出
-
    按下：
-
      下載 CSV 並清空資料
-
    會：
-
      1. 匯出 UTF-8 BOM CSV
      2. 依時間排序
      3. 清空 IndexedDB
 
 6. CSV 欄位
-
    timestamp  台北時間(UTC+8)
    totalEmpty 五場總剩餘車位
    各停車場剩餘車位
    日期
    星期
    小時
-
    範例：
-
    timestamp,totalEmpty,...
    2026-10-15 09:30:00,128,...
-
 7. 時區
-
    CSV 中：
-
      timestamp
      日期
      星期
      小時
-
    全部使用：
-
      Asia/Taipei (UTC+8)
-
    方便 Excel / Power BI 分析。
 
 8. output=1
-
    網址加入：
-
      ?output=1
-
    例如：
-
      CarEmpty.html?output=1
-
    可直接匯出 CSV 並清空資料，
    不需手動點按鈕。
 
 9. IndexedDB 版本
-
    DB_VERSION = 10
-
    未來若調整資料結構：
-
      DB_VERSION++
-
    即可自動升級資料庫。
 
 10. 分析用途
-
    匯出的 CSV 可直接用於：
-
      - Excel
      - Power BI
      - Python Pandas
-
    常見分析：
-
      - 尖峰時段
      - 平日/假日差異
      - 滿位預警
@@ -262,899 +202,490 @@ th:first-child{
 ==========================================================
 */
 
-const siteIds=[
-40908,
-40909,
-40910,
-40911,
-40912
-];
+      const siteIds = [40908, 40909, 40910, 40911, 40912];
 
-const parkingInfo = {};
-const WEEKDAY_NAMES = [
-    "星期日",
-    "星期一",
-    "星期二",
-    "星期三",
-    "星期四",
-    "星期五",
-    "星期六"
-];      
-const DB_NAME="YMSParkingDB";
-const DB_VERSION=10;      
-const SNAPSHOT_STORE="snapshots";
-const STATE_STORE="state";
+      const parkingInfo = {};
+      const WEEKDAY_NAMES = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"];
+      const DB_NAME = "YMSParkingDB";
+      const DB_VERSION = 10;
+      const SNAPSHOT_STORE = "snapshots";
+      const STATE_STORE = "state";
 
-const tableBody=
-document.querySelector(
-"#parkingTable tbody"
-);
+      const tableBody = document.querySelector("#parkingTable tbody");
 
-const lastUpdateDiv=
-document.getElementById(
-"lastUpdate"
-);
+      const lastUpdateDiv = document.getElementById("lastUpdate");
 
-const countdownDiv=
-document.getElementById(
-"countdown"
-);
+      const countdownDiv = document.getElementById("countdown");
 
-const totalEmptyDiv=
-document.getElementById(
-"totalEmpty"
-);
+      const totalEmptyDiv = document.getElementById("totalEmpty");
 
-const recordCountDiv=
-document.getElementById(
-"recordCount"
-);
+      const recordCountDiv = document.getElementById("recordCount");
 
-let countdown=30;
-let countdownTimer;
-let dbPromise = null;
-function openDB(){
-if(dbPromise){
+      let countdown = 30;
+      let countdownTimer;
+      let dbPromise = null;
+      function openDB() {
+        if (dbPromise) {
+          return dbPromise;
+        }
+        dbPromise = new Promise((resolve, reject) => {
+          const req = indexedDB.open(DB_NAME, DB_VERSION);
+
+          req.onupgradeneeded = (e) => {
+            const db = e.target.result;
+
+            if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) {
+              db.createObjectStore(SNAPSHOT_STORE, {
+                keyPath: "id",
+                autoIncrement: true,
+              });
+            }
+
+            if (!db.objectStoreNames.contains(STATE_STORE)) {
+              db.createObjectStore(STATE_STORE, {
+                keyPath: "siteId",
+              });
+            }
+          };
+
+          req.onsuccess = () => resolve(req.result);
+
+          req.onerror = () => reject(req.error);
+        });
         return dbPromise;
-    }
- dbPromise = new Promise(
- (resolve,reject)=>{
-
-  const req=
-  indexedDB.open(
-   DB_NAME,
-   DB_VERSION
-  );
-
-  req.onupgradeneeded=e=>{
-
-   const db=
-   e.target.result;
-
-   if(
-    !db.objectStoreNames.contains(
-     SNAPSHOT_STORE
-    )
-   ){
-    db.createObjectStore(
-     SNAPSHOT_STORE,
-     {
-      keyPath:"id",
-      autoIncrement:true
-     }
-    );
-   }
-
-   if(
-    !db.objectStoreNames.contains(
-     STATE_STORE
-    )
-   ){
-    db.createObjectStore(
-     STATE_STORE,
-     {
-      keyPath:"siteId"
-     }
-    );
-   }
-
-  };
-
-  req.onsuccess=
-  ()=>resolve(req.result);
-
-  req.onerror=
-  ()=>reject(req.error);
-
- });
- return dbPromise;
-}
-/* =====================================
+      }
+      /* =====================================
    Snapshot Store
 ===================================== */
 
-async function saveSnapshot(
-    nowTs,
-    totalEmpty,
-    values
-){
+      async function saveSnapshot(nowTs, totalEmpty, values) {
+        const db = await openDB();
 
-    const db =
-        await openDB();
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(SNAPSHOT_STORE, "readwrite");
 
-    return new Promise((resolve, reject) => {
-
-        const tx =
-            db.transaction(
-                SNAPSHOT_STORE,
-                "readwrite"
-            );
-
-        tx.objectStore(
-            SNAPSHOT_STORE
-        ).add({
-
+          tx.objectStore(SNAPSHOT_STORE).add({
             timestamp: nowTs,
 
             totalEmpty,
 
-            p40908:
-                values[40908] ?? null,
+            p40908: values[40908] ?? null,
 
-            p40909:
-                values[40909] ?? null,
+            p40909: values[40909] ?? null,
 
-            p40910:
-                values[40910] ?? null,
+            p40910: values[40910] ?? null,
 
-            p40911:
-                values[40911] ?? null,
+            p40911: values[40911] ?? null,
 
-            p40912:
-                values[40912] ?? null
+            p40912: values[40912] ?? null,
+          });
 
+          tx.oncomplete = () => resolve();
+
+          tx.onerror = () => reject(tx.error);
+
+          tx.onabort = () => reject(tx.error);
         });
+      }
 
-        tx.oncomplete =
-            () => resolve();
-
-        tx.onerror =
-            () => reject(tx.error);
-
-        tx.onabort =
-            () => reject(tx.error);
-
-    });
-
-}
-
-/* =====================================
+      /* =====================================
    State Store
 ===================================== */
 
+      async function saveStates(nowTs, values) {
+        const db = await openDB();
 
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STATE_STORE, "readwrite");
 
-async function saveStates(
-    nowTs,
-    values
-){
+          const store = tx.objectStore(STATE_STORE);
 
-    const db =
-        await openDB();
-
-    return new Promise((resolve, reject) => {
-
-        const tx =
-            db.transaction(
-                STATE_STORE,
-                "readwrite"
-            );
-
-        const store =
-            tx.objectStore(
-                STATE_STORE
-            );
-
-        for(const id of siteIds){
-
-            if(
-                values[id]
-                === undefined
-            ){
-                continue;
+          for (const id of siteIds) {
+            if (values[id] === undefined) {
+              continue;
             }
 
             store.put({
+              siteId: id,
 
-                siteId: id,
+              carEmpty: values[id],
 
-                carEmpty:
-                    values[id],
+              updateTime: nowTs,
+            });
+          }
 
-                updateTime:
-                    nowTs
+          tx.oncomplete = () => resolve();
 
+          tx.onerror = () => reject(tx.error);
+
+          tx.onabort = () => reject(tx.error);
+        });
+      }
+
+      async function getAllStates() {
+        const db = await openDB();
+
+        return new Promise((resolve, reject) => {
+          const tx = db.transaction(STATE_STORE, "readonly");
+
+          const req = tx.objectStore(STATE_STORE).getAll();
+
+          req.onsuccess = () => {
+            const states = {};
+
+            req.result.forEach((item) => {
+              states[item.siteId] = item.carEmpty;
             });
 
-        }
+            resolve(states);
+          };
 
-        tx.oncomplete =
-            () => resolve();
+          req.onerror = () => reject(req.error);
+        });
+      }
 
-        tx.onerror =
-            () => reject(tx.error);
-
-        tx.onabort =
-            () => reject(tx.error);
-
-    });
-
-}      
-
-async function getAllStates(){
-
-    const db =
-        await openDB();
-
-    return new Promise((resolve, reject)=>{
-
-        const tx =
-            db.transaction(
-                STATE_STORE,
-                "readonly"
-            );
-
-        const req =
-            tx.objectStore(
-                STATE_STORE
-            ).getAll();
-
-        req.onsuccess =
-            ()=>{
-
-                const states = {};
-
-                req.result.forEach(item=>{
-
-                    states[
-                        item.siteId
-                    ] =
-                    item.carEmpty;
-
-                });
-
-                resolve(states);
-
-            };
-
-        req.onerror =
-            ()=>reject(req.error);
-
-    });
-
-}
-      
-/* =====================================
+      /* =====================================
    Record Count
 ===================================== */
 
-async function updateRecordCount(){
+      async function updateRecordCount() {
+        const db = await openDB();
 
-    const db =
-        await openDB();
+        const tx = db.transaction(SNAPSHOT_STORE, "readonly");
 
-    const tx =
-        db.transaction(
-            SNAPSHOT_STORE,
-            "readonly"
-        );
+        const req = tx.objectStore(SNAPSHOT_STORE).count();
 
-    const req =
-        tx.objectStore(
-            SNAPSHOT_STORE
-        ).count();
-
-    req.onsuccess =
-        () => {
-
-            recordCountDiv.textContent =
-                "快照筆數："
-                + req.result;
-
+        req.onsuccess = () => {
+          recordCountDiv.textContent = "快照筆數：" + req.result;
         };
+      }
 
-}
-
-
-/* =====================================
+      /* =====================================
    Cleanup 90 Days
 ===================================== */
 
-async function cleanupOldData(){
+      async function cleanupOldData() {
+        const db = await openDB();
 
-    const db =
-        await openDB();
+        const tx = db.transaction(SNAPSHOT_STORE, "readwrite");
 
-    const tx =
-        db.transaction(
-            SNAPSHOT_STORE,
-            "readwrite"
-        );
+        const store = tx.objectStore(SNAPSHOT_STORE);
 
-    const store =
-        tx.objectStore(
-            SNAPSHOT_STORE
-        );
+        const limit = Date.now() - 90 * 24 * 60 * 60 * 1000;
 
-    const limit =
-        Date.now()
-        -
-        (
-            90
-            *
-            24
-            *
-            60
-            *
-            60
-            *
-            1000
-        );
+        store.openCursor().onsuccess = function (event) {
+          const cursor = event.target.result;
 
-    store.openCursor().onsuccess =
-        function(event){
+          if (!cursor) {
+            return;
+          }
 
-            const cursor =
-                event.target.result;
+          if (cursor.value.timestamp < limit) {
+            cursor.delete();
+          }
 
-            if(
-                !cursor
-            ){
-                return;
-            }
-
-            if(
-                cursor.value.timestamp
-                < limit
-            ){
-                cursor.delete();
-            }
-
-            cursor.continue();
-
+          cursor.continue();
         };
-return new Promise(
-        (resolve,reject)=>{
+        return new Promise((resolve, reject) => {
+          tx.oncomplete = async () => {
+            resolve();
+          };
 
-            tx.oncomplete =
-            async ()=>{
+          tx.onerror = () => reject(tx.error);
 
-                
+          tx.onabort = () => reject(tx.error);
+        });
+      }
 
-                resolve();
-            };
-
-            tx.onerror=
-                ()=>reject(tx.error);
-
-            tx.onabort=
-                ()=>reject(tx.error);
-
-        }
-    );
-}
-
-
-/* =====================================
+      /* =====================================
    Clear Database
 ===================================== */
 
-async function clearDatabase(){
+      async function clearDatabase() {
+        const db = await openDB();
 
-const db =
-        await openDB();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction([SNAPSHOT_STORE, STATE_STORE], "readwrite");
 
-    await new Promise((resolve, reject) => {
+          tx.objectStore(SNAPSHOT_STORE).clear();
 
-        const tx =
-            db.transaction(
-                [SNAPSHOT_STORE, STATE_STORE],
-                "readwrite"
-            );
+          tx.objectStore(STATE_STORE).clear();
 
-        tx.objectStore(
-            SNAPSHOT_STORE
-        ).clear();
+          tx.oncomplete = () => resolve();
 
-        tx.objectStore(
-            STATE_STORE
-        ).clear();
+          tx.onerror = () => reject(tx.error);
 
-        tx.oncomplete =
-            () => resolve();
+          tx.onabort = () => reject(tx.error);
+        });
 
-        tx.onerror =
-            () => reject(tx.error);
-
-        tx.onabort =
-            () => reject(tx.error);
-
-    });
-
-    await updateRecordCount();
-}
-/* =====================================
+        await updateRecordCount();
+      }
+      /* =====================================
    CSV Escape
 ===================================== */
 
-function escapeCSV(value){
+      function escapeCSV(value) {
+        if (value === null || value === undefined) {
+          return "";
+        }
 
-    if(
-        value === null ||
-        value === undefined
-    ){
-        return "";
-    }
+        return '"' + String(value).replace(/"/g, '""') + '"';
+      }
 
-    return '"' +
-        String(value)
-            .replace(/"/g,'""')
-        + '"';
-
-}
-
-
-/* =====================================
+      /* =====================================
    Export CSV
 ===================================== */
 
-async function exportCSV(skipConfirm = false){
+      async function exportCSV(skipConfirm = false) {
+        if (!skipConfirm && !confirm("下載CSV後將清空資料，是否繼續？")) {
+          return;
+        }
 
-    if(
-        !skipConfirm &&!confirm(
-            "下載CSV後將清空資料，是否繼續？"
-        )
-    ){
-        return;
-    }
+        const db = await openDB();
 
-    const db =
-        await openDB();
+        const tx = db.transaction(SNAPSHOT_STORE, "readonly");
 
-    const tx =
-        db.transaction(
-            SNAPSHOT_STORE,
-            "readonly"
-        );
+        const store = tx.objectStore(SNAPSHOT_STORE);
 
-    const store =
-        tx.objectStore(
-            SNAPSHOT_STORE
-        );
+        const req = store.getAll();
 
-    const req =
-        store.getAll();
+        req.onsuccess = async () => {
+          const rows = req.result || [];
 
-    req.onsuccess =
-    async ()=>{
+          rows.sort((a, b) => a.timestamp - b.timestamp);
 
-        const rows =
-            req.result || [];
-
-        rows.sort(
-            (a,b)=>
-                a.timestamp -
-                b.timestamp
-        );
-
-        let csv =
+          let csv =
             [
-                "timestamp",
-                "totalEmpty",
-                  "日期",
-                "星期",
-                "小時",
-                ...siteIds.map(id => parkingInfo[id] || `p${id}`)
-                  
-           ].join(",")
-           + "\n";
-        rows.forEach(r=>{
-              const dt =
-    new Date(r.timestamp);
+              "timestamp",
+              "totalEmpty",
+              "日期",
+              "星期",
+              "小時",
+              ...siteIds.map((id) => parkingInfo[id] || `p${id}`),
+            ].join(",") + "\n";
+          rows.forEach((r) => {
+            const dt = new Date(r.timestamp);
             let taipeiDate = new Date(
-    dt.toLocaleString(
-        "en-US",
-        {
-            timeZone: "Asia/Taipei"
-        }
-    ));
-              let taipeiTime = dt.toLocaleString("sv-SE", {
-                        timeZone: "Asia/Taipei"
-                    })
-            csv += [
-
-                escapeCSV(
-                    taipeiTime
-                ),
-
-                escapeCSV(
-                    r.totalEmpty
-                ),
-escapeCSV(
-                    taipeiTime.substring(0, 10)
-                ),  
-                escapeCSV(
-                    WEEKDAY_NAMES[taipeiDate.getDay()]
-                ),
-                escapeCSV(
-                    taipeiDate.getHours()
-                ),
-                escapeCSV(
-                    r.p40908
-                ),
-
-                escapeCSV(
-                    r.p40909
-                ),
-
-                escapeCSV(
-                    r.p40910
-                ),
-
-                escapeCSV(
-                    r.p40911
-                ),
-
-                escapeCSV(
-                    r.p40912
-                )
-                
-
-            ].join(",")
-
-            + "\n";
-
-        });
-
-        /* UTF-8 BOM */
-        const BOM =
-            "\uFEFF";
-
-        const blob =
-            new Blob(
-                [
-                    BOM + csv
-                ],
-                {
-                    type:
-                    "text/csv;charset=utf-8"
-                }
+              dt.toLocaleString("en-US", {
+                timeZone: "Asia/Taipei",
+              }),
             );
+            let taipeiTime = dt.toLocaleString("sv-SE", {
+              timeZone: "Asia/Taipei",
+            });
+            csv +=
+              [
+                escapeCSV(taipeiTime),
 
-        const link =
-            document.createElement(
-                "a"
-            );
+                escapeCSV(r.totalEmpty),
+                escapeCSV(taipeiTime.substring(0, 10)),
+                escapeCSV(WEEKDAY_NAMES[taipeiDate.getDay()]),
+                escapeCSV(taipeiDate.getHours()),
+                escapeCSV(r.p40908),
 
-        link.href =
-            URL.createObjectURL(
-                blob
-            );
-const exportTime =
-    new Date().toLocaleString(
-        "sv-SE",
-        {
-            timeZone:
-                "Asia/Taipei"
-        }
-    )
-    .replaceAll(" ","_")
-    .replaceAll(":","-");
-          link.download =
-    `YMSParking_${exportTime}.csv`;
-        
-        document.body.appendChild(
-            link
-        );
+                escapeCSV(r.p40909),
 
-        link.click();
+                escapeCSV(r.p40910),
 
-        link.remove();
+                escapeCSV(r.p40911),
 
-        URL.revokeObjectURL(
-            link.href
-        );
+                escapeCSV(r.p40912),
+              ].join(",") + "\n";
+          });
 
-        await clearDatabase();
+          /* UTF-8 BOM */
+          const BOM = "\uFEFF";
 
-        alert(
-            "CSV已下載，資料庫已清空。"
-        );
+          const blob = new Blob([BOM + csv], {
+            type: "text/csv;charset=utf-8",
+          });
 
-    };
+          const link = document.createElement("a");
 
-}
+          link.href = URL.createObjectURL(blob);
+          const exportTime = new Date()
+            .toLocaleString("sv-SE", {
+              timeZone: "Asia/Taipei",
+            })
+            .replaceAll(" ", "_")
+            .replaceAll(":", "-");
+          link.download = `YMSParking_${exportTime}.csv`;
 
+          document.body.appendChild(link);
 
-/* =====================================
+          link.click();
+
+          link.remove();
+
+          URL.revokeObjectURL(link.href);
+
+          await clearDatabase();
+
+          alert("CSV已下載，資料庫已清空。");
+        };
+      }
+
+      /* =====================================
    Download Button
 ===================================== */
 
-document
-.getElementById(
-    "downloadBtn"
-)
-.addEventListener(
-    "click",
-    exportCSV
-);
+      document.getElementById("downloadBtn").addEventListener("click", exportCSV);
 
-
-/* =====================================
+      /* =====================================
    Auto Output Mode
 ===================================== */
 
-async function handleOutputMode(){
+      async function handleOutputMode() {
+        const params = new URLSearchParams(location.search);
 
-    const params =
-        new URLSearchParams(
-            location.search
-        );
+        if (params.get("output") === "1") {
+          await exportCSV(true);
 
-    if(
-        params.get(
-            "output"
-        ) === "1"
-    ){
+          return true;
+        }
 
-        await exportCSV(true);
-
-        return true;
-    }
-
-    return false;
-
-}
-/* =====================================
+        return false;
+      }
+      /* =====================================
    Fetch Data
 ===================================== */
 
-async function fetchData(){
+      async function fetchData() {
+        await cleanupOldData();
 
-    await cleanupOldData();
+        const currentValues = {};
 
-    const currentValues = {};
+        let totalEmpty = 0;
 
-    let totalEmpty = 0;
+        tableBody.innerHTML = "";
 
-    tableBody.innerHTML = "";
+        for (const id of siteIds) {
+          try {
+            const response = await fetch(`https://ymsnpapi.altob.com.tw/api/Map/Get?siteId=${id}`);
 
-    for(const id of siteIds){
+            const data = await response.json();
 
-        try{
+            const row = document.createElement("tr");
 
-            const response =
-                await fetch(
-                    `https://ymsnpapi.altob.com.tw/api/Map/Get?siteId=${id}`
-                );
+            const nameCell = document.createElement("td");
 
-            const data =
-                await response.json();
+            const emptyCell = document.createElement("td");
 
-            const row =
-                document.createElement("tr");
-
-            const nameCell =
-                document.createElement("td");
-
-            const emptyCell =
-                document.createElement("td");
-
-            const carEmpty =
-                Number(data.carEmpty);
+            const carEmpty = Number(data.carEmpty);
 
             parkingInfo[id] = data.name || `停車場${id}`;
-            nameCell.textContent =
-                data.name || `停車場${id}`;
+            nameCell.textContent = data.name || `停車場${id}`;
 
-            emptyCell.textContent =
-                Number.isFinite(carEmpty)
-                    ? carEmpty
-                    : "N/A";
+            emptyCell.textContent = Number.isFinite(carEmpty) ? carEmpty : "N/A";
 
-            if(
-                Number.isFinite(carEmpty)
-            ){
+            if (Number.isFinite(carEmpty)) {
+              currentValues[id] = carEmpty;
 
-                currentValues[id] =
-                    carEmpty;
+              totalEmpty += carEmpty;
 
-                totalEmpty +=
-                    carEmpty;
-
-                if(
-                    carEmpty < 5
-                ){
-                    row.classList.add(
-                        "highlight"
-                    );
-                }
-
+              if (carEmpty < 5) {
+                row.classList.add("highlight");
+              }
             }
 
-            row.appendChild(
-                nameCell
-            );
+            row.appendChild(nameCell);
 
-            row.appendChild(
-                emptyCell
-            );
+            row.appendChild(emptyCell);
 
-            tableBody.appendChild(
-                row
-            );
-
-        }
-        catch(error){
-
-            console.error(
-                `站點 ${id} 抓取失敗`,
-                error
-            );
-
+            tableBody.appendChild(row);
+          } catch (error) {
+            console.error(`站點 ${id} 抓取失敗`, error);
+          }
         }
 
-    }
+        /* -------- 檢查是否有變動 -------- */
 
-    /* -------- 檢查是否有變動 -------- */
-
-    let changed = false;
-const previousStates =
-    await getAllStates();
-    for(const id of siteIds){
-
-        if(
-            currentValues[id]
-            === undefined
-        ){
+        let changed = false;
+        const previousStates = await getAllStates();
+        for (const id of siteIds) {
+          if (currentValues[id] === undefined) {
             continue;
-        }
+          }
 
-        const previous =   previousStates[id];
+          const previous = previousStates[id];
 
+          const current = currentValues[id];
 
-        const current =
-            currentValues[id];
-
-        if(
-            previous == null
-            ||
-            previous !== current
-        ){
-
+          if (previous == null || previous !== current) {
             changed = true;
             break;
-
+          }
         }
 
-    }
+        /* -------- 有變動才存快照 -------- */
 
-    /* -------- 有變動才存快照 -------- */
+        if (changed) {
+          const nowTs = Date.now();
+          await saveSnapshot(nowTs, totalEmpty, currentValues);
 
-    if(changed){
-      const nowTs = Date.now();
-        await saveSnapshot(
-              nowTs,
-            totalEmpty,
-            currentValues
-        );
+          await saveStates(nowTs, currentValues);
+          await updateRecordCount();
+        }
 
-        await saveStates(
-    nowTs,
-    currentValues
-);
-        await updateRecordCount();
+        /* -------- 更新資訊區 -------- */
 
-    }
+        totalEmptyDiv.textContent = "總剩餘車位數：" + totalEmpty;
 
-    /* -------- 更新資訊區 -------- */
+        const now = new Date();
 
-    totalEmptyDiv.textContent =
-        "總剩餘車位數："
-        + totalEmpty;
+        const formatted =
+          now.getFullYear() +
+          "-" +
+          String(now.getMonth() + 1).padStart(2, "0") +
+          "-" +
+          String(now.getDate()).padStart(2, "0") +
+          " " +
+          String(now.getHours()).padStart(2, "0") +
+          ":" +
+          String(now.getMinutes()).padStart(2, "0") +
+          ":" +
+          String(now.getSeconds()).padStart(2, "0");
 
-    const now =
-        new Date();
+        lastUpdateDiv.textContent = "最後更新時間：" + formatted;
 
-    const formatted =
-        now.getFullYear()
-        + "-"
-        + String(
-            now.getMonth()+1
-        ).padStart(2,"0")
-        + "-"
-        + String(
-            now.getDate()
-        ).padStart(2,"0")
-        + " "
-        + String(
-            now.getHours()
-        ).padStart(2,"0")
-        + ":"
-        + String(
-            now.getMinutes()
-        ).padStart(2,"0")
-        + ":"
-        + String(
-            now.getSeconds()
-        ).padStart(2,"0");
+        /* -------- 倒數計時 -------- */
 
-    lastUpdateDiv.textContent =
-        "最後更新時間："
-        + formatted;
+        countdown = 30;
 
-    /* -------- 倒數計時 -------- */
+        countdownDiv.textContent = "下次更新剩餘秒數：" + countdown;
 
-    countdown = 30;
+        clearInterval(countdownTimer);
 
-    countdownDiv.textContent =
-        "下次更新剩餘秒數："
-        + countdown;
+        countdownTimer = setInterval(() => {
+          countdown--;
 
-    clearInterval(
-        countdownTimer
-    );
+          countdownDiv.textContent = "下次更新剩餘秒數：" + countdown;
 
-    countdownTimer =
-        setInterval(()=>{
+          if (countdown <= 0) {
+            clearInterval(countdownTimer);
+          }
+        }, 1000);
+      }
 
-            countdown--;
-
-            countdownDiv.textContent =
-                "下次更新剩餘秒數："
-                + countdown;
-
-            if(
-                countdown <= 0
-            ){
-                clearInterval(
-                    countdownTimer
-                );
-            }
-
-        },1000);
-
-}
-
-
-/* =====================================
+      /* =====================================
    Main
 ===================================== */
 
-async function main(){
+      async function main() {
+        await updateRecordCount();
 
-    await updateRecordCount();
+        const outputMode = await handleOutputMode();
 
-    const outputMode =
-        await handleOutputMode();
+        if (outputMode) {
+          return;
+        }
 
-    if(
-        outputMode
-    ){
-        return;
-    }
+        await fetchData();
 
-    await fetchData();
+        setInterval(fetchData, 30000);
+      }
 
-    setInterval(
-        fetchData,
-        30000
-    );
-
-}
-
-main();
-
-</script>
-</body>
-</html>    
+      main();
+    </script>
+  </body>
+</html>
