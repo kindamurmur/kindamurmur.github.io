@@ -142,6 +142,7 @@ const WEEKDAY_NAMES = [
     "星期六"
 ];      
 const DB_NAME="YMSParkingDB";
+const DB_VERSION=10;      
 const SNAPSHOT_STORE="snapshots";
 const STATE_STORE="state";
 
@@ -181,7 +182,7 @@ function openDB(){
   const req=
   indexedDB.open(
    DB_NAME,
-   1
+   DB_VERSION
   );
 
   req.onupgradeneeded=e=>{
