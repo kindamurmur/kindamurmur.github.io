@@ -131,6 +131,8 @@ const siteIds=[
 40912
 ];
 
+const parkingInfo = {};
+      
 const DB_NAME="YMSParkingDB";
 const SNAPSHOT_STORE="snapshots";
 const STATE_STORE="state";
@@ -530,7 +532,13 @@ async function exportCSV(){
 
         let csv =
         "timestamp,totalEmpty,p40908,p40909,p40910,p40911,p40912\n";
-
+        let csv =
+        [
+            "timestamp",
+            "totalEmpty",
+            ...parkingIds.map(id => parkingInfo[id] || `p${id}`)
+       ].join(",")
+    + "\n";
         rows.forEach(r=>{
 
             csv += [
@@ -710,6 +718,7 @@ async function fetchData(){
             const carEmpty =
                 Number(data.carEmpty);
 
+            parkingInfo[id] = data.name || `停車場${id}`;
             nameCell.textContent =
                 data.name || `停車場${id}`;
 
